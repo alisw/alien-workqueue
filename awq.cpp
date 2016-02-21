@@ -19,15 +19,22 @@ extern "C" {
 #define AWQ_WAIT_TASK 5
 #define AWQ_MAX_TASK_WAIT 45
 
-void write_stat(int waiting, int running) {
+void write_stats(struct work_queue *q) {
   static char buf[10];
+  struct work_queue_stats stats;
   int index = 0;
+  work_queue_get_stats(q, &stats);
+  debug("WORKERS: init: %d / ready: %d / busy: %d",
+        stats.workers_init, stats.workers_ready, stats.workers_busy);
+  debug("TASKS: waiting: %d / complete: %d / running: %d",
+        stats.tasks_waiting, stats.tasks_complete, stats.tasks_running);
   debug("writing stats");
   mkdir("/tmp/aa", AWQ_DIRMODE);
   mkdir("/tmp/aa/stat", AWQ_DIRMODE);
   std::ofstream of("/tmp/aa/stat/tmp");
-  of << "WAITING=" << waiting << std::endl;
-  of << "RUNNING=" << running << std::endl;
+  of << "WAITING=" << stats.tasks_waiting << std::endl;
+  of << "RUNNING=" << stats.tasks_running << std::endl;
+  of << "TIMESTAMP=" << time(NULL) << std::endl;
   of.close();
   rename("/tmp/aa/stat/tmp", "/tmp/aa/stat/latest");  // atomic
 }
@@ -111,19 +118,13 @@ void loop(struct work_queue *q, std::vector<int> &taskids) {
   watch_queue(q, taskids);
 
   debug("waiting for tasks to finish");
-  struct work_queue_stats stats;
   struct work_queue_task *t;
   time_t tbeg, tend;
   tbeg = time(NULL);
   int elap;
   while ((elap = (int)difftime(time(NULL), tbeg)) < AWQ_MAX_TASK_WAIT &&
          !work_queue_empty(q)) {
-    work_queue_get_stats(q, &stats);
-    debug("WORKERS: init: %d / ready: %d / busy: %d",
-          stats.workers_init, stats.workers_ready, stats.workers_busy);
-    debug("TASKS: waiting: %d / complete: %d / running: %d",
-          stats.tasks_waiting, stats.tasks_complete, stats.tasks_running);
-    write_stat(stats.tasks_waiting, stats.tasks_running);
+    write_stats(q);
     debug("waiting up to %d seconds for a task to complete", AWQ_WAIT_TASK);
     t = work_queue_wait(q, AWQ_WAIT_TASK);
     if (!t) continue;
@@ -133,6 +134,8 @@ void loop(struct work_queue *q, std::vector<int> &taskids) {
     debug("one off, %llu left", taskids.size());
     tend = time(NULL);
   }
+
+  write_stats(q);
 
   if ((elap = AWQ_MAX_TASK_WAIT-elap) > 0) {
     debug("pausing %d more seconds", elap);
