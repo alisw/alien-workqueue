@@ -18,6 +18,7 @@ extern "C" {
 #define AWQ_DIRMODE (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 #define AWQ_WAIT_TASK 5
 #define AWQ_MAX_TASK_WAIT 45
+#define AWQ_JOB_LIMIT 10000
 
 void write_stats(struct work_queue *q) {
   static char buf[10];
@@ -51,6 +52,10 @@ void watch_queue(struct work_queue *q, std::vector<int> &taskids) {
   assert(rkv_v == 0);
   assert(dp != NULL);
   while (ep = readdir(dp)) {
+    if (taskids.size() >= AWQ_JOB_LIMIT) {
+      debug("job limit reached");
+      break;
+    }
     if (ep->d_type != DT_REG) continue;
     jobfn_s.str(std::string());
     jobfn_s << qdir << "/" << ep->d_name;
@@ -81,7 +86,7 @@ void watch_queue(struct work_queue *q, std::vector<int> &taskids) {
       else {
         debug("adding script %s to the queue, output on %s",
               script.c_str(), output.c_str());
-        struct work_queue_task *t = work_queue_task_create("./agent.sh > log 2>&1");
+        struct work_queue_task *t = work_queue_task_create("env PATH=/bin:/usr/bin LD_LIBRARY_PATH= ./agent.sh > log 2>&1");
         work_queue_task_specify_file(t, script.c_str(), "agent.sh",
                                      WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
         work_queue_task_specify_file(t, output.c_str(), "log",
@@ -115,7 +120,8 @@ void watch_queue(struct work_queue *q, std::vector<int> &taskids) {
 }
 
 void loop(struct work_queue *q, std::vector<int> &taskids) {
-  watch_queue(q, taskids);
+  if (access("/tmp/aa/drain", F_OK) == -1) watch_queue(q, taskids);
+  else debug("drain mode: not accepting new jobs");
 
   debug("waiting for tasks to finish");
   struct work_queue_task *t;
