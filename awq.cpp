@@ -17,7 +17,7 @@ extern "C" {
 #define debug(...) fprintf(stderr, __VA_ARGS__); fputc('\n', stderr)
 #define AWQ_DIRMODE (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 #define AWQ_WAIT_TASK 5
-#define AWQ_MAX_TASK_WAIT 45
+#define AWQ_MAX_TASK_WAIT 30
 #define AWQ_JOB_LIMIT 10000
 
 void write_stats(struct work_queue *q) {
