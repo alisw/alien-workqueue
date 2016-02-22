@@ -119,8 +119,9 @@ void watch_queue(struct work_queue *q, std::vector<int> &taskids) {
   closedir(dp);
 }
 
-void loop(struct work_queue *q, std::vector<int> &taskids) {
-  if (access("/tmp/aa/drain", F_OK) == -1) watch_queue(q, taskids);
+bool loop(struct work_queue *q, std::vector<int> &taskids) {
+  bool draining = (access("/tmp/aa/drain", F_OK) != -1);
+  if (!draining) watch_queue(q, taskids);
   else debug("drain mode: not accepting new jobs");
 
   debug("waiting for tasks to finish");
@@ -142,11 +143,17 @@ void loop(struct work_queue *q, std::vector<int> &taskids) {
   }
 
   write_stats(q);
+  if (draining && work_queue_empty(q)) {
+    debug("draining finished, exiting");
+    return false;
+  }
 
   if ((elap = AWQ_MAX_TASK_WAIT-elap) > 0) {
     debug("pausing %d more seconds", elap);
     sleep(elap);
   }
+
+  return true;
 }
 
 int main(int argn, char *argv[]) {
@@ -158,9 +165,6 @@ int main(int argn, char *argv[]) {
   debug("listening on port %d", work_queue_port(q));
   std::vector<int> taskids;
 
-  while (1) {
-    loop(q, taskids);
-  }
-
+  while (loop(q, taskids));
   return 0;
 }
