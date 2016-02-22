@@ -1,0 +1,20 @@
+#!/bin/bash -e
+AWQ=${AWQ:-/tmp/aa}
+source $AWQ/stat/latest
+NOW=$(date --utc +%s)
+[[ $((NOW-TIMESTAMP)) -lt 200 ]]
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == -constraint ]]; then
+    case "$2" in
+      "JobStatus==1")
+        for ((I=0; I<WAITING; I++)); do echo "**waiting**"; done
+      ;;
+      "JobStatus==1 || JobStatus==2")
+        for ((I=0; I<WAITING; I++)); do echo "**waiting**"; done
+        for ((I=0; I<RUNNING; I++)); do echo "**running**"; done
+      ;;
+    esac
+    break
+  fi
+  shift
+done

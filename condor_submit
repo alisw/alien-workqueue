@@ -1,0 +1,9 @@
+#!/bin/bash -e
+AWQ=${AWQ:-/tmp/aa}
+QUEUE=$AWQ/queue
+mkdir -p "$QUEUE"
+T=$(mktemp)
+cat > $T
+HASH=$(sha1sum $T)
+HASH=${HASH%% *}
+mv -f $T $QUEUE/job-$HASH
