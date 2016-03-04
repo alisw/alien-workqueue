@@ -7,7 +7,6 @@ WQ_WORKDIR=$HOME/WQ_WORKDIR
 WQ_DRAIN=$HOME/WQ_DRAIN
 
 which work_queue_worker > /dev/null
-which aliensh > /dev/null
 
 pid_desc() {
   local children=$(ps -o pid= --ppid "$1")
