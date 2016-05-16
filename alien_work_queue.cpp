@@ -10,6 +10,7 @@
 #include <cassert>
 #include <ctime>
 #include <regex.h>
+#include <unistd.h>
 extern "C" {
   #include <work_queue.h>
 }
