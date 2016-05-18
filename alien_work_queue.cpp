@@ -21,6 +21,12 @@ extern "C" {
 #define AWQ_MAX_TASK_WAIT 30
 #define AWQ_JOB_LIMIT 10000
 
+int is_file(const std::string &path) {
+  static struct stat statbuf;
+  stat(path.c_str(), &statbuf);
+  return S_ISREG(statbuf.st_mode);
+}
+
 void write_stats(struct work_queue *q) {
   static char buf[10];
   struct work_queue_stats stats;
@@ -57,9 +63,10 @@ void watch_queue(struct work_queue *q, std::vector<int> &taskids) {
       debug("job limit reached");
       break;
     }
-    if (ep->d_type != DT_REG) continue;
     jobfn_s.str(std::string());
     jobfn_s << qdir << "/" << ep->d_name;
+    if (!is_file(jobfn_s.str())) continue;
+    debug(jobfn_s.str().c_str());
     std::string jobfn = jobfn_s.str();
     std::ifstream fh(jobfn.c_str());
     std::string line;
