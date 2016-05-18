@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 WQ_MASTER=127.0.0.1:9094
 WQ_FOREMEN=${WQ_FOREMEN:-"127.0.0.1"}
 WQ_NUM_FOREMEN=${WQ_NUM_FOREMEN:-"2"}
@@ -23,16 +23,20 @@ pick_port() {
   echo $((PORT + WQ_MASTER_BASEPORT))
 }
 
+function cond_redir() {
+  [[ "$WQ_DEBUG" == 1 ]] && cat || tee /dev/null > /dev/null
+}
+
 case "$1" in
   workers)
     while [[ 1 ]]; do
       TIME0=$(date --utc +%s)
-      work_queue_worker --cores 1 \
-                        --debug all \
-                        --single-shot \
-                        --workdir $WQ_WORKDIR \
+      work_queue_worker --cores 1               \
+                        --debug all             \
+                        --single-shot           \
+                        --workdir $WQ_WORKDIR   \
                         $WQ_FOREMEN `pick_port` \
-                        > /dev/null 2>&1 || true
+                        2>&1 | cond_redir
       [[ -e $WQ_DRAIN ]] && break
       [[ $((`date --utc +%s`-TIME0)) -lt 30 ]] && sleep 30
     done
