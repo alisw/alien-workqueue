@@ -1,0 +1,55 @@
+sudo: required
+dist: trusty
+
+services:
+
+language: cpp
+
+install: |
+  set -x
+  CCTOOLS_VER=5.4.17
+  mkdir -p /tmp/cctools
+  pushd /tmp/cctools
+    curl -O http://ccl.cse.nd.edu/software/files/cctools-$CCTOOLS_VER-source.tar.gz
+    tar xzf *.tar.gz
+    cd cctools*
+    ./configure --prefix /usr
+    make -j$(grep -c bogomips /proc/cpuinfo) > /dev/null 2>&1
+    sudo make install > /dev/null 2>&1
+  popd
+  work_queue_worker --help
+  mkdir build
+  pushd build
+    cmake .. -DCMAKE_INSTALL_PREFIX=/usr \
+             -DCCTOOLS=/usr
+    make -j$(grep -c bogomips /proc/cpuinfo)
+    sudo make install
+  popd
+  which alien_wq_worker.sh
+
+script: |
+  set -ex
+  cd /
+  printf "#!/bin/bash -e\necho this is a test\n" > /tmp/job.sh
+  chmod +x /tmp/job.sh
+  alien_wq_worker.sh start-foremen
+  alien_wq_worker.sh start-workers
+  set +x
+  for MODE in "--job-wrapper /usr/etc/alien_job_wrapper.sh" ""; do
+    OK=
+    echo Starting alien_work_queue $MODE
+    alien_work_queue $MODE &
+    echo Waiting for the system to settle for 15 seconds...
+    sleep 15
+    ps aux | grep -v grep | grep work_queue || true
+    rm -f /tmp/job.out
+    printf "executable = /tmp/job.sh\noutput = /tmp/job.out\n" | condor_submit
+    for ((I=0; I<60; I++)); do
+      echo Waiting for results of alien_work_queue $MODE since $I seconds
+      [[ $(cat /tmp/job.out 2> /dev/null || true) == "this is a test" ]] && { echo "OK!"; OK=1; break; } || sleep 1
+    done
+    [[ $OK == 1 ]] && { killall -KILL alien_work_queue; continue; } || true
+    echo Job output for alien_work_queue $MODE does not match expectations:
+    cat /tmp/job.out || true
+    false
+  done
