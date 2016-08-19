@@ -37,14 +37,12 @@ script: |
   set +x
   for MODE in "--job-wrapper /usr/etc/alien_job_wrapper.sh" ""; do
     OK=
-    echo Starting alien_work_queue $MODE
-    alien_work_queue $MODE &
-    echo Waiting for the system to settle for 15 seconds...
-    sleep 15
+    echo Testing alien_work_queue $MODE
     ps aux | grep -v grep | grep work_queue || true
     rm -f /tmp/job.out
     printf "executable = /tmp/job.sh\noutput = /tmp/job.out\n" | condor_submit
-    for ((I=0; I<60; I++)); do
+    alien_work_queue $MODE &
+    for ((I=0; I<40; I++)); do
       echo Waiting for results of alien_work_queue $MODE since $I seconds
       [[ $(cat /tmp/job.out 2> /dev/null || true) == "this is a test" ]] && { echo "OK!"; OK=1; break; } || sleep 1
     done
