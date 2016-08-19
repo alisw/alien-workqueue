@@ -15,7 +15,8 @@ extern "C" {
   #include <work_queue.h>
 }
 
-#define debug(...) fprintf(stderr, __VA_ARGS__); fputc('\n', stderr)
+#define debug(...) { fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); }
+#define die(...) { fputs("FATAL: ", stderr); fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); exit(1); }
 #define AWQ_DIRMODE (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 #define AWQ_WAIT_TASK 5
 #define AWQ_MAX_TASK_WAIT 30
@@ -47,7 +48,7 @@ void write_stats(struct work_queue *q) {
   rename("/tmp/aa/stat/tmp", "/tmp/aa/stat/latest");  // atomic
 }
 
-void watch_queue(struct work_queue *q, std::vector<int> &taskids) {
+void watch_queue(struct work_queue *q, std::vector<int> &taskids, std::string &job_wrapper) {
   debug("watching for new jobs in spool");
   const char *qdir = "/tmp/aa/queue";
   DIR *dp = opendir(qdir);
@@ -94,7 +95,13 @@ void watch_queue(struct work_queue *q, std::vector<int> &taskids) {
       else {
         debug("adding script %s to the queue, output on %s",
               script.c_str(), output.c_str());
-        struct work_queue_task *t = work_queue_task_create("env PATH=/bin:/usr/bin LD_LIBRARY_PATH= ./agent.sh > log 2>&1");
+        struct work_queue_task *t = work_queue_task_create(job_wrapper.empty() ?
+                                                           "./agent.sh > log 2>&1":
+                                                           "./wrapper.sh ./agent.sh > log 2>&1");
+        if (!job_wrapper.empty()) {
+          work_queue_task_specify_file(t, job_wrapper.c_str(), "wrapper.sh",
+                                       WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
+        }
         work_queue_task_specify_file(t, script.c_str(), "agent.sh",
                                      WORK_QUEUE_INPUT, WORK_QUEUE_NOCACHE);
         work_queue_task_specify_file(t, output.c_str(), "log",
@@ -127,9 +134,9 @@ void watch_queue(struct work_queue *q, std::vector<int> &taskids) {
   closedir(dp);
 }
 
-bool loop(struct work_queue *q, std::vector<int> &taskids) {
+bool loop(struct work_queue *q, std::vector<int> &taskids, std::string &job_wrapper) {
   bool draining = (access("/tmp/aa/drain", F_OK) != -1);
-  if (!draining) watch_queue(q, taskids);
+  if (!draining) watch_queue(q, taskids, job_wrapper);
   else debug("drain mode: not accepting new jobs");
 
   debug("waiting for tasks to finish");
@@ -167,12 +174,25 @@ bool loop(struct work_queue *q, std::vector<int> &taskids) {
 int main(int argn, char *argv[]) {
   debug("starting alien-workqueue");
 
+  std::string job_wrapper;
+  {
+    std::string curr, next;
+    for (int i=1; i<argn; i++) {
+      curr = argv[i];
+      next = i+1 < argn ? argv[i+1] : "";
+      if ((curr == "--job-wrapper") && !next.empty()) {
+        job_wrapper = next; i++;
+      }
+      else die("argument %s unrecognized", curr.c_str());
+    }
+  }
+
   struct work_queue *q = work_queue_create(9094);
   mkdir("/tmp/aa", AWQ_DIRMODE);
   mkdir("/tmp/aa/queue", AWQ_DIRMODE);
   debug("listening on port %d", work_queue_port(q));
   std::vector<int> taskids;
 
-  while (loop(q, taskids));
+  while (loop(q, taskids, job_wrapper));
   return 0;
 }

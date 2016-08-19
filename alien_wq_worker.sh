@@ -1,10 +1,11 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 WQ_MASTER=127.0.0.1:9094
 WQ_FOREMEN=${WQ_FOREMEN:-"127.0.0.1"}
 WQ_NUM_FOREMEN=${WQ_NUM_FOREMEN:-"2"}
 WQ_MASTER_BASEPORT=9080
 WQ_WORKDIR=$HOME/WQ_WORKDIR
 WQ_DRAIN=$HOME/WQ_DRAIN
+[[ ! -z "$USER" ]] || USER=$(whoami)
 
 which work_queue_worker > /dev/null
 
@@ -61,15 +62,21 @@ case "$1" in
       workers) NW=$(grep -c bogomips /proc/cpuinfo) ;;
       *) false ;;
     esac
-    NW=$(( NW-`$0 count` ))
+    NW=$(( NW-`$0 count-$WQSERVICE` ))
     echo "Number of Work Queue $WQSERVICE to start: $NW"
     for ((I=0; I<NW; I++)); do
       nohup $0 $WQSERVICE $I > /dev/null 2>&1 &
     done
   ;;
-  count)
+  count-*)
+    WQSERVICE=${1#*-}
+    case $WQSERVICE in
+      foremen) GREP=--foreman ;;
+      workers) GREP=--cores ;;
+      *) false ;;
+    esac
     ps -e -o user,pid,command | grep $USER | grep -v grep | \
-      grep -c work_queue_worker || true
+      grep work_queue_worker | grep -c -- $GREP || true
   ;;
   drain)
     mkdir -p $WQ_DRAIN
