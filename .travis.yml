@@ -32,8 +32,11 @@ script: |
   cd /
   printf "#!/bin/bash -e\necho this is a test\n" > /tmp/job.sh
   chmod +x /tmp/job.sh
-  alien_wq_worker.sh start-foremen
-  alien_wq_worker.sh start-workers
+  WQ_NUM_FOREMEN=3 alien_wq_worker.sh start-foremen
+  WQ_NUM_WORKERS=5 alien_wq_worker.sh start-workers
+  sleep 5
+  [[ $(alien_wq_worker.sh count-foremen) == 3 ]]
+  [[ $(alien_wq_worker.sh count-workers) == 5 ]]
   set +x
   for MODE in "--job-wrapper /usr/etc/alien_job_wrapper.sh" ""; do
     OK=
