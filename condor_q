@@ -1,6 +1,6 @@
 #!/bin/bash -e
-AWQ=${AWQ:-/tmp/aa}
-source $AWQ/stat/latest
+AWQ_WORKDIR=${AWQ_WORKDIR:-/tmp/awq}
+source $AWQ_WORKDIR/stat/latest
 NOW=$(date --utc +%s)
 [[ $((NOW-TIMESTAMP)) -lt 200 ]]
 while [[ $# -gt 0 ]]; do

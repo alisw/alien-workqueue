@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <sstream>
 #include <cstdio>
+#include <cstring>
+#include <cerrno>
 #include <vector>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -21,14 +23,21 @@ extern "C" {
 #define AWQ_WAIT_TASK 5
 #define AWQ_MAX_TASK_WAIT 30
 #define AWQ_JOB_LIMIT 10000
+#define AWQ_DEFAULT_WORKDIR "/tmp/awq"
 
 int is_file(const std::string &path) {
   static struct stat statbuf;
-  stat(path.c_str(), &statbuf);
+  if (stat(path.c_str(), &statbuf)) return false;
   return S_ISREG(statbuf.st_mode);
 }
 
-void write_stats(struct work_queue *q) {
+int is_dir(const std::string &path) {
+  static struct stat statbuf;
+  if (stat(path.c_str(), &statbuf)) return false;
+  return S_ISDIR(statbuf.st_mode);
+}
+
+void write_stats(struct work_queue *q, std::string &work_dir) {
   static char buf[10];
   struct work_queue_stats stats;
   int index = 0;
@@ -38,20 +47,22 @@ void write_stats(struct work_queue *q) {
   debug("TASKS: waiting: %d / complete: %d / running: %d",
         stats.tasks_waiting, stats.tasks_complete, stats.tasks_running);
   debug("writing stats");
-  mkdir("/tmp/aa", AWQ_DIRMODE);
-  mkdir("/tmp/aa/stat", AWQ_DIRMODE);
-  std::ofstream of("/tmp/aa/stat/tmp");
+  std::string stat_dir = work_dir+"/stat";
+  if (!is_dir(stat_dir) && mkdir(stat_dir.c_str(), AWQ_DIRMODE)) {
+    die("cannot create stat dir %s: %s", stat_dir.c_str(), strerror(errno));
+  }
+  std::ofstream of((stat_dir+"/tmp").c_str());
   of << "WAITING=" << stats.tasks_waiting << std::endl;
   of << "RUNNING=" << stats.tasks_running << std::endl;
   of << "TIMESTAMP=" << time(NULL) << std::endl;
   of.close();
-  rename("/tmp/aa/stat/tmp", "/tmp/aa/stat/latest");  // atomic
+  rename((stat_dir+"/tmp").c_str(), (stat_dir+"/latest").c_str());  // atomic
 }
 
-void watch_queue(struct work_queue *q, std::vector<int> &taskids, std::string &job_wrapper) {
+void watch_queue(struct work_queue *q, std::vector<int> &taskids, std::string &job_wrapper, std::string &work_dir) {
   debug("watching for new jobs in spool");
-  const char *qdir = "/tmp/aa/queue";
-  DIR *dp = opendir(qdir);
+  std::string queue_dir = work_dir+"/queue";
+  DIR *dp = opendir(queue_dir.c_str());
   struct dirent *ep;
   std::stringstream jobfn_s;
   regex_t rkv;
@@ -65,9 +76,8 @@ void watch_queue(struct work_queue *q, std::vector<int> &taskids, std::string &j
       break;
     }
     jobfn_s.str(std::string());
-    jobfn_s << qdir << "/" << ep->d_name;
+    jobfn_s << queue_dir << "/" << ep->d_name;
     if (!is_file(jobfn_s.str())) continue;
-    debug(jobfn_s.str().c_str());
     std::string jobfn = jobfn_s.str();
     std::ifstream fh(jobfn.c_str());
     std::string line;
@@ -134,9 +144,10 @@ void watch_queue(struct work_queue *q, std::vector<int> &taskids, std::string &j
   closedir(dp);
 }
 
-bool loop(struct work_queue *q, std::vector<int> &taskids, std::string &job_wrapper) {
-  bool draining = (access("/tmp/aa/drain", F_OK) != -1);
-  if (!draining) watch_queue(q, taskids, job_wrapper);
+bool loop(struct work_queue *q, std::vector<int> &taskids, std::string &job_wrapper,
+          std::string &work_dir) {
+  bool draining = is_file(work_dir+"/drain");
+  if (!draining) watch_queue(q, taskids, job_wrapper, work_dir);
   else debug("drain mode: not accepting new jobs");
 
   debug("waiting for tasks to finish");
@@ -146,18 +157,18 @@ bool loop(struct work_queue *q, std::vector<int> &taskids, std::string &job_wrap
   int elap;
   while ((elap = (int)difftime(time(NULL), tbeg)) < AWQ_MAX_TASK_WAIT &&
          !work_queue_empty(q)) {
-    write_stats(q);
+    write_stats(q, work_dir);
     debug("waiting up to %d seconds for a task to complete", AWQ_WAIT_TASK);
     t = work_queue_wait(q, AWQ_WAIT_TASK);
     if (!t) continue;
     taskids.erase(std::remove(taskids.begin(), taskids.end(), t->taskid),
                   taskids.end());
     work_queue_task_delete(t);
-    debug("one off, %llu left", taskids.size());
+    debug("one off, %lu left", (unsigned long)taskids.size());
     tend = time(NULL);
   }
 
-  write_stats(q);
+  write_stats(q, work_dir);
   if (draining && work_queue_empty(q)) {
     debug("draining finished, exiting");
     return false;
@@ -175,6 +186,7 @@ int main(int argn, char *argv[]) {
   debug("starting alien-workqueue");
 
   std::string job_wrapper;
+  std::string work_dir = AWQ_DEFAULT_WORKDIR;
   {
     std::string curr, next;
     for (int i=1; i<argn; i++) {
@@ -183,16 +195,27 @@ int main(int argn, char *argv[]) {
       if ((curr == "--job-wrapper") && !next.empty()) {
         job_wrapper = next; i++;
       }
+      else if ((curr == "--work-dir") && !next.empty()) {
+        work_dir = next; i++;
+      }
       else die("argument %s unrecognized", curr.c_str());
     }
   }
 
+  if (job_wrapper.empty()) debug("using job wrapper %s", job_wrapper.c_str());
+  debug("using workdir %s", work_dir.c_str());
+
   struct work_queue *q = work_queue_create(9094);
-  mkdir("/tmp/aa", AWQ_DIRMODE);
-  mkdir("/tmp/aa/queue", AWQ_DIRMODE);
+  if (!is_dir(work_dir) && mkdir(work_dir.c_str(), AWQ_DIRMODE)) {
+    die("cannot create workdir %s: %s", work_dir.c_str(), strerror(errno));
+  }
+  std::string queue_dir = work_dir+"/queue";
+  if (!is_dir(queue_dir) && mkdir(queue_dir.c_str(), AWQ_DIRMODE)) {
+    die("cannot create queue dir %s: %s", queue_dir.c_str(), strerror(errno));
+  }
   debug("listening on port %d", work_queue_port(q));
   std::vector<int> taskids;
 
-  while (loop(q, taskids, job_wrapper));
+  while (loop(q, taskids, job_wrapper, work_dir));
   return 0;
 }

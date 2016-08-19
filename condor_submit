@@ -1,6 +1,6 @@
 #!/bin/bash -e
-AWQ=${AWQ:-/tmp/aa}
-QUEUE=$AWQ/queue
+AWQ_WORKDIR=${AWQ_WORKDIR:-/tmp/awq}
+QUEUE=$AWQ_WORKDIR/queue
 mkdir -p "$QUEUE"
 T=$(mktemp)
 cat > $T
