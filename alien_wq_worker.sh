@@ -59,7 +59,8 @@ case "$1" in
     WQSERVICE=${1#*-}
     case $WQSERVICE in
       foremen) NW=$WQ_NUM_FOREMEN ;;
-      workers) NW=$(grep -c bogomips /proc/cpuinfo) ;;
+      workers) NW=$WQ_NUM_WORKERS
+               [[ -z $NW ]] && NW=$(grep -c bogomips /proc/cpuinfo) || true ;;
       *) false ;;
     esac
     NW=$(( NW-`$0 count-$WQSERVICE` ))
