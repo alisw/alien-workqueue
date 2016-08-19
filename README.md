@@ -130,6 +130,9 @@ The following options are available to `alien_work_queue`:
   [Parrot](http://ccl.cse.nd.edu/software/parrot/) if the
   [CVMFS](https://cernvm.cern.ch/portal/filesystem) mount point is not available
   in the job environment.
+* `--work-dir <full_path>`: working directory (defaults to `/tmp/awq`). If you
+  set this parameter you must also `export AWQ_WORKDIR` for making it visible
+  to the fake `condor_*` commands.
 
 
 Motivation and use

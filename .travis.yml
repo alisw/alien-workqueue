@@ -38,19 +38,21 @@ script: |
   [[ $(alien_wq_worker.sh count-foremen) == 3 ]]
   [[ $(alien_wq_worker.sh count-workers) == 5 ]]
   set +x
-  for MODE in "--job-wrapper /usr/etc/alien_job_wrapper.sh" ""; do
+  export AWQ_WORKDIR=/tmp/awq_test
+  for CMD in "alien_work_queue --job-wrapper /usr/etc/alien_job_wrapper.sh --work-dir $AWQ_WORKDIR" \
+             "alien_work_queue --work-dir $AWQ_WORKDIR"; do
     OK=
-    echo Testing alien_work_queue $MODE
+    echo "==> Testing $CMD"
     ps aux | grep -v grep | grep work_queue || true
     rm -f /tmp/job.out
     printf "executable = /tmp/job.sh\noutput = /tmp/job.out\n" | condor_submit
-    alien_work_queue $MODE &
+    $CMD &
     for ((I=0; I<40; I++)); do
-      echo Waiting for results of alien_work_queue $MODE since $I seconds
+      echo "Waiting for results of $CMD since $I seconds"
       [[ $(cat /tmp/job.out 2> /dev/null || true) == "this is a test" ]] && { echo "OK!"; OK=1; break; } || sleep 1
     done
     [[ $OK == 1 ]] && { killall -KILL alien_work_queue; continue; } || true
-    echo Job output for alien_work_queue $MODE does not match expectations:
+    echo "Job output for $CMD does not match expectations:"
     cat /tmp/job.out || true
     false
   done
