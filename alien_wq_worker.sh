@@ -1,13 +1,13 @@
 #!/bin/bash -e
-WQ_MASTER=127.0.0.1:9094
+WQ_MASTER=${WQ_MASTER:-"127.0.0.1:9094"}
 WQ_FOREMEN=${WQ_FOREMEN:-"127.0.0.1"}
 WQ_NUM_FOREMEN=${WQ_NUM_FOREMEN:-"2"}
-WQ_MASTER_BASEPORT=9080
-WQ_WORKDIR=$HOME/WQ_WORKDIR
-WQ_DRAIN=$HOME/WQ_DRAIN
+WQ_MASTER_BASEPORT=${WQ_MASTER_BASEPORT:-"9080"}
+WQ_WORKDIR=${WQ_WORKDIR:-"$HOME/.alien_wq_tmp"}
+WQ_DRAIN=${WQ_DRAIN:-"$HOME/.alien_wq_drain"}
 [[ ! -z "$USER" ]] || USER=$(whoami)
 
-which work_queue_worker > /dev/null
+which work_queue_worker > /dev/null || { echo "Work Queue not found!"; exit 1; }
 
 pid_desc() {
   local children=$(ps -o pid= --ppid "$1")
@@ -42,10 +42,16 @@ case "$1" in
       [[ $((`date --utc +%s`-TIME0)) -lt 30 ]] && sleep 30
     done
   ;;
-  stop)
+  stop-*)
     mkdir -p $WQ_DRAIN
+    WQSERVICE=${1#*-}
+    case $WQSERVICE in
+      foremen) GREP=--foreman ;;
+      workers) GREP=--cores ;;
+      *) false ;;
+    esac
     PIDS=$(ps -e -o user,pid,command | grep $USER | grep -v grep | \
-      grep work_queue_worker | awk '{print $2}')
+      grep work_queue_worker | grep -- $GREP | awk '{print $2}')
     kill -TERM $PIDS 2> /dev/null || true
     [[ "$PIDS" != '' ]] && sleep 2
     for PID in $PIDS; do
