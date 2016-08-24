@@ -56,3 +56,19 @@ script: |
     cat /tmp/job.out || true
     false
   done
+  echo "==> Testing catalog server"
+  set -x
+  printf "#!/bin/bash -e\nsleep 1000\n" > /tmp/job.sh
+  printf "executable = /tmp/job.sh\noutput = /tmp/job.out\n" | condor_submit
+  alien_work_queue --work-dir $AWQ_WORKDIR --catalog-host localhost --catalog-port 9097 &
+  catalog_server --update-host=do-not-update-please --history=/tmp/catalog.history/ &
+  set +x
+  OK=
+  for ((I=0; I<100; I++)); do
+    echo "Waiting for catalog server update since $I seconds"
+    (curl -sq http://localhost:9097/query.text 2> /dev/null || true) | grep -q "project alien_jobs" \
+      && { echo "Catalog OK!"; OK=1; break; } || sleep 1
+  done
+  [[ $OK == 1 ]] || { echo "Project not registered to the catalog! Output of catalog query:"; \
+                      ( curl http://localhost:9097/query.text || true ); false; }
+  echo "All tests successful!"

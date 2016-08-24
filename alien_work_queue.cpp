@@ -24,6 +24,7 @@ extern "C" {
 #define AWQ_MAX_TASK_WAIT 30
 #define AWQ_JOB_LIMIT 10000
 #define AWQ_DEFAULT_WORKDIR "/tmp/awq"
+#define AWQ_PROJECT_NAME "alien_jobs"
 
 int is_file(const std::string &path) {
   static struct stat statbuf;
@@ -187,6 +188,9 @@ int main(int argn, char *argv[]) {
 
   std::string job_wrapper;
   std::string work_dir = AWQ_DEFAULT_WORKDIR;
+  std::string catalog_host;
+  int         catalog_port = 9097;
+  std::string proj_name = AWQ_PROJECT_NAME;
   {
     std::string curr, next;
     for (int i=1; i<argn; i++) {
@@ -198,6 +202,15 @@ int main(int argn, char *argv[]) {
       else if ((curr == "--work-dir") && !next.empty()) {
         work_dir = next; i++;
       }
+      else if ((curr == "--catalog-host") && !next.empty()) {
+        catalog_host = next; i++;
+      }
+      else if ((curr == "--catalog-port") && !next.empty()) {
+        std::istringstream(next) >> catalog_port; i++;
+      }
+      else if ((curr == "--project-name") && !next.empty()) {
+        proj_name = next; i++;
+      }
       else die("argument %s unrecognized", curr.c_str());
     }
   }
@@ -205,7 +218,6 @@ int main(int argn, char *argv[]) {
   if (job_wrapper.empty()) debug("using job wrapper %s", job_wrapper.c_str());
   debug("using workdir %s", work_dir.c_str());
 
-  struct work_queue *q = work_queue_create(9094);
   if (!is_dir(work_dir) && mkdir(work_dir.c_str(), AWQ_DIRMODE)) {
     die("cannot create workdir %s: %s", work_dir.c_str(), strerror(errno));
   }
@@ -213,7 +225,19 @@ int main(int argn, char *argv[]) {
   if (!is_dir(queue_dir) && mkdir(queue_dir.c_str(), AWQ_DIRMODE)) {
     die("cannot create queue dir %s: %s", queue_dir.c_str(), strerror(errno));
   }
+
+  struct work_queue *q = work_queue_create(9094);
   debug("listening on port %d", work_queue_port(q));
+
+  if (!catalog_host.empty() && catalog_port) {
+    debug("reporting to catalog %s:%d as project %s", catalog_host.c_str(),
+                                                      catalog_port,
+                                                      proj_name.c_str());
+    work_queue_specify_master_mode(q, WORK_QUEUE_MASTER_MODE_CATALOG);
+    work_queue_specify_catalog_server(q, catalog_host.c_str(), catalog_port);
+    work_queue_specify_name(q, proj_name.c_str());
+  }
+
   std::vector<int> taskids;
 
   while (loop(q, taskids, job_wrapper, work_dir));
