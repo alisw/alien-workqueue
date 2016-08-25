@@ -58,7 +58,7 @@ Foremen will be started in the background. They can be terminated with:
 
     alien_wq_worker.sh stop-foremen
 
-Used ports are by defaut from 9080 to 9080+`$WQ_NUM_FOREMEN`-1. See the
+Used ports are by defaut from `9080` to `9080+$WQ_NUM_FOREMEN-1`. See the
 [advanced usage](#advanced-functionalities) for configuring this paramenter and
 more.
 
@@ -85,6 +85,11 @@ Inside the screen:
 
 Terminate it with `Ctrl-C`.
 
+Note that by default no [Work Queue
+Catalog](http://ccl.cse.nd.edu/software/manuals/catalog.html) is updated. To
+enable reporting to the catalog see the `--catalog-*` parameters under
+[advanced usage](#advanced-functionalities).
+
 
 Starting workers on execute nodes
 ---------------------------------
@@ -110,9 +115,9 @@ The following variables can be defined when starting `alien_wq_worker.sh`:
   `alien_work_queue` process. Port is mandatory. Defaults to `127.0.0.1:9094`.
 * `WQ_FOREMEN`: host (IP or hostname) where foremen are running. Defaults to
   `127.0.0.1`.
-* `WQ_NUM_FOREMEN`: number of foremen. Defaults to 2.
+* `WQ_NUM_FOREMEN`: number of foremen. Defaults to `2`.
 * `WQ_MASTER_BASEPORT`: first listening port of the foremen. Every foreman will
-  listen to `$WQ_MASTER_BASEPORT + index`. Defaults to 9080.
+  listen to `$WQ_MASTER_BASEPORT + index`. Defaults to `9080`.
 * `WQ_WORKDIR`: writable temporary directory for Work Queue foremen and/or
   workers. Defaults to `~/.alien_wq_tmp`. Does not need to be created in
   advance.
@@ -133,6 +138,12 @@ The following options are available to `alien_work_queue`:
 * `--work-dir <full_path>`: working directory (defaults to `/tmp/awq`). If you
   set this parameter you must also `export AWQ_WORKDIR` for making it visible
   to the fake `condor_*` commands.
+* `--catalog-host <host>`, `--catalog-port <port>`: if specified, report
+  information to the specified Work Queue Catalog server. Port is optional and
+  defaults to `9097`. Project name can be optionally specified with
+  `--project-name`.
+* `--project-name`: project name reported to the catalog server, if enabled.
+  Defaults to `alien_jobs`.
 
 
 Motivation and use
