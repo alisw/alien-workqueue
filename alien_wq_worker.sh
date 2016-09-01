@@ -5,7 +5,9 @@ WQ_NUM_FOREMEN=${WQ_NUM_FOREMEN:-"2"}
 WQ_MASTER_BASEPORT=${WQ_MASTER_BASEPORT:-"9080"}
 WQ_WORKDIR=${WQ_WORKDIR:-"$HOME/.alien_wq_tmp"}
 WQ_DRAIN=${WQ_DRAIN:-"$HOME/.alien_wq_drain"}
+WQ_ONESHOT=${WQ_ONESHOT:-"0"}
 [[ ! -z "$USER" ]] || USER=$(whoami)
+#[[ $WQ_DEBUG == 1 ]] && set -x
 
 which work_queue_worker > /dev/null || { echo "Work Queue not found!"; exit 1; }
 
@@ -30,15 +32,18 @@ function cond_redir() {
 
 case "$1" in
   workers)
+    set -x
     while [[ 1 ]]; do
       TIME0=$(date --utc +%s)
-      work_queue_worker --cores 1               \
-                        --debug all             \
-                        --single-shot           \
-                        --workdir $WQ_WORKDIR   \
-                        $WQ_FOREMEN `pick_port` \
+      mkdir -p $WQ_WORKDIR
+      work_queue_worker --cores 1                                      \
+                        --debug all                                    \
+                        --single-shot                                  \
+                        --workdir $WQ_WORKDIR                          \
+                        ${WQ_ONESHOT:+--single-task --idle-timeout=45} \
+                        $WQ_FOREMEN `pick_port`                        \
                         2>&1 | cond_redir
-      [[ -e $WQ_DRAIN ]] && break
+      [[ $WQ_ONESHOT == 1 || -e $WQ_DRAIN ]] && break
       [[ $((`date --utc +%s`-TIME0)) -lt 30 ]] && sleep 30
     done
   ;;
@@ -92,13 +97,17 @@ case "$1" in
     while [[ 1 ]]; do
       TIME0=$(date --utc +%s)
       INDEX=$2
-      work_queue_worker --foreman \
+      work_queue_worker --foreman                                      \
                         --foreman-port $((WQ_MASTER_BASEPORT + INDEX)) \
-                        --workdir $WQ_WORKDIR \
-                        `echo $WQ_MASTER | sed -e 's/:/ /' ` \
+                        --workdir $WQ_WORKDIR                          \
+                        `echo $WQ_MASTER | sed -e 's/:/ /' `           \
                         > /dev/null 2>&1
       [[ -e $WQ_DRAIN ]] && break
       [[ $((`date --utc +%s`-TIME0)) -lt 30 ]] && sleep 30
     done
+  ;;
+  *)
+    echo "$1: invalid command"
+    false
   ;;
 esac
