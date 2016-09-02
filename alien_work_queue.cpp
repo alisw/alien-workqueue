@@ -215,7 +215,7 @@ int main(int argn, char *argv[]) {
     }
   }
 
-  if (job_wrapper.empty()) debug("using job wrapper %s", job_wrapper.c_str());
+  if (!job_wrapper.empty()) debug("using job wrapper %s", job_wrapper.c_str());
   debug("using workdir %s", work_dir.c_str());
 
   if (!is_dir(work_dir) && mkdir(work_dir.c_str(), AWQ_DIRMODE)) {
