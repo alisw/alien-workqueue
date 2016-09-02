@@ -7,6 +7,7 @@ WQ_WORKDIR=${WQ_WORKDIR:-"$HOME/.alien_wq_tmp"}
 WQ_DRAIN=${WQ_DRAIN:-"$HOME/.alien_wq_drain"}
 WQ_ONESHOT=${WQ_ONESHOT:-"0"}
 [[ ! -z "$USER" ]] || USER=$(whoami)
+# debug only, will remove
 #[[ $WQ_DEBUG == 1 ]] && set -x
 
 which work_queue_worker > /dev/null || { echo "Work Queue not found!"; exit 1; }
