@@ -106,6 +106,19 @@ To stop them:
     alien_wq_worker.sh stop-workers
 
 
+Starting workers on execute nodes without foremen (connect to master only)
+--------------------------------------------------------------------------
+
+In this case we are not using any foreman. We start the workers like this:
+
+    source $HOME/awq/etc/env.sh
+    WQ_NUM_FOREMEN=1 WQ_FOREMEN=master_host WQ_MASTER_BASEPORT=9094 alien_wq_worker.sh start-workers
+
+From the point of view of the `work_queue_worker` there is no difference in
+connecting to a master or to a foreman. Here we are assuming that the master is
+running on port `9094` of host `master_host`.
+
+
 Advanced functionalities
 ------------------------
 
