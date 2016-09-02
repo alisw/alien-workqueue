@@ -30,7 +30,7 @@ install: |
 script: |
   set -ex
   cd /
-  printf "#!/bin/bash -e\necho this is a test\n" > /tmp/job.sh
+  printf '#!/bin/bash -e\necho this is a ${ALIEN_TEST_VARIABLE}${FILTERED_OUT}\n' > /tmp/job.sh
   chmod +x /tmp/job.sh
   WQ_NUM_FOREMEN=3 alien_wq_worker.sh start-foremen
   WQ_NUM_WORKERS=5 alien_wq_worker.sh start-workers
@@ -43,16 +43,17 @@ script: |
              "alien_work_queue --work-dir $AWQ_WORKDIR"; do
     OK=
     echo "==> Testing $CMD"
+    [[ "$CMD" == *wrapper* ]] && EXPECT='this is a test' || EXPECT='this is a testyabba'
     ps aux | grep -v grep | grep work_queue || true
     rm -f /tmp/job.out
-    printf "executable = /tmp/job.sh\noutput = /tmp/job.out\n" | condor_submit
+    printf 'executable = /tmp/job.sh\noutput = /tmp/job.out\nenvironment = ALIEN_TEST_VARIABLE=test;FILTERED_OUT=yabba\n' | condor_submit
     $CMD &
     for ((I=0; I<40; I++)); do
       echo "Waiting for results of $CMD since $I seconds"
-      [[ $(cat /tmp/job.out 2> /dev/null || true) == "this is a test" ]] && { echo "OK!"; OK=1; break; } || sleep 1
+      [[ $(cat /tmp/job.out 2> /dev/null || true) == "$EXPECT" ]] && { echo "OK (expecting \"$EXPECT\")"; OK=1; break; } || sleep 1
     done
     [[ $OK == 1 ]] && { killall -KILL alien_work_queue; continue; } || true
-    echo "Job output for $CMD does not match expectations:"
+    echo "Job output for $CMD does not match expectations ($EXPECT), generated output:"
     cat /tmp/job.out || true
     false
   done
