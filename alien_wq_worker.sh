@@ -6,6 +6,7 @@ WQ_MASTER_BASEPORT=${WQ_MASTER_BASEPORT:-"9080"}
 WQ_WORKDIR=${WQ_WORKDIR:-"$HOME/.alien_wq_tmp"}
 WQ_DRAIN=${WQ_DRAIN:-"$HOME/.alien_wq_drain"}
 WQ_SINGLETASK=${WQ_SINGLETASK:-"0"}
+WQ_IDLETIMEOUT=${WQ_IDLETIMEOUT:-"100"}
 [[ ! -z "$USER" ]] || USER=$(whoami)
 [[ $WQ_DEBUG == 1 ]] && set -x
 
@@ -43,7 +44,8 @@ case "$1" in
                         --debug all                                       \
                         --single-shot                                     \
                         --workdir $WQ_WORKDIR                             \
-                        ${WQ_SINGLETASK:+--single-task --idle-timeout=45} \
+                        ${WQ_IDLETIMEOUT:+--idle-timeout=$WQ_IDLETIMEOUT} \
+                        ${WQ_SINGLETASK:+--single-task}                   \
                         $WQ_FOREMEN `pick_port`                           \
                         2>&1 | cond_redir
       [[ $WQ_SINGLETASK == 1 || -e $WQ_DRAIN ]] && break

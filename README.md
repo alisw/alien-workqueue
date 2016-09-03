@@ -140,6 +140,8 @@ The following variables can be defined when starting `alien_wq_worker.sh`:
   run in "single task" mode, _i.e._ it will shut down after executing the first
   task. This is useful in the case where workers are frequently scheduled as
   microservices (as in Mesos).
+* `WQ_IDLETIMEOUT`: number of seconds to wait for a new task before exiting.
+  Defaults to `100`.
 
 The following options are available to `alien_work_queue`:
 
