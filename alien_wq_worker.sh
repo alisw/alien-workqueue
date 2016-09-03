@@ -7,6 +7,7 @@ WQ_WORKDIR=${WQ_WORKDIR:-"$HOME/.alien_wq_tmp"}
 WQ_DRAIN=${WQ_DRAIN:-"$HOME/.alien_wq_drain"}
 WQ_SINGLETASK=${WQ_SINGLETASK:-"0"}
 WQ_IDLETIMEOUT=${WQ_IDLETIMEOUT:-"100"}
+WQ_NORESPAWN=${WQ_NORESPAWN:-"0"}
 [[ ! -z "$USER" ]] || USER=$(whoami)
 [[ $WQ_DEBUG == 1 ]] && set -x
 
@@ -48,7 +49,7 @@ case "$1" in
                         ${WQ_SINGLETASK:+--single-task}                   \
                         $WQ_FOREMEN `pick_port`                           \
                         2>&1 | cond_redir
-      [[ $WQ_SINGLETASK == 1 || -e $WQ_DRAIN ]] && break
+      [[ $WQ_NORESPAWN == 1 || -e $WQ_DRAIN ]] && break
       [[ $((`date --utc +%s`-TIME0)) -lt 30 ]] && sleep 30
     done
   ;;

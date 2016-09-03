@@ -142,6 +142,8 @@ The following variables can be defined when starting `alien_wq_worker.sh`:
   microservices (as in Mesos).
 * `WQ_IDLETIMEOUT`: number of seconds to wait for a new task before exiting.
   Defaults to `100`.
+* `WQ_NORESPAWN`: do not respawn `work_queue_worker` after it exits if set to
+  `1`. Defaults to `0` (_i.e._ respawn indefinitely).
 
 The following options are available to `alien_work_queue`:
 
